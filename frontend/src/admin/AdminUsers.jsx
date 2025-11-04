@@ -1,22 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { db, doc, getDoc, collection, getDocs } from '../firebase';
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        const usersCollection = collection(db, 'users');
-        const userSnapshot = await getDocs(usersCollection);
-        const userList = userSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setUsers(userList);
+        // Use the backend API instead of direct Firebase calls
+        const response = await fetch('http://localhost:5000/api/users');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch users');
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          setUsers(result.data);
+        } else {
+          throw new Error(result.message || 'Failed to fetch users');
+        }
       } catch (error) {
         console.error('Error fetching users:', error);
+        setError(error.message);
       } finally {
         setLoading(false);
       }
@@ -25,8 +33,32 @@ const AdminUsers = () => {
     fetchUsers();
   }, []);
 
+  const handleDeleteUser = async (userId) => {
+    if (window.confirm('Are you sure you want to delete this user?')) {
+      try {
+        const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          // Remove the user from the local state
+          setUsers(users.filter(user => user.id !== userId));
+        } else {
+          throw new Error('Failed to delete user');
+        }
+      } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Error deleting user: ' + error.message);
+      }
+    }
+  };
+
   if (loading) {
     return <div className="text-center py-4">Loading users...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-4 text-red-600">Error: {error}</div>;
   }
 
   return (
@@ -46,6 +78,9 @@ const AdminUsers = () => {
                 College
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Year of Study
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
@@ -62,11 +97,17 @@ const AdminUsers = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {user.college}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {user.yearOfStudy}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button className="text-indigo-600 hover:text-indigo-900 mr-2">
                     View
                   </button>
-                  <button className="text-red-600 hover:text-red-900">
+                  <button 
+                    onClick={() => handleDeleteUser(user.id)}
+                    className="text-red-600 hover:text-red-900"
+                  >
                     Delete
                   </button>
                 </td>
@@ -74,6 +115,12 @@ const AdminUsers = () => {
             ))}
           </tbody>
         </table>
+        
+        {users.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No users found
+          </div>
+        )}
       </div>
     </div>
   );
