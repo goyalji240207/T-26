@@ -50,6 +50,12 @@ const AdminDashboard = () => {
                   Registrations
                 </Link>
                 <Link
+                  to="/admin/workshops"
+                  className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Workshops
+                </Link>
+                <Link
                   to="/admin/analytics"
                   className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
                 >

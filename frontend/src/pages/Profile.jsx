@@ -2,6 +2,8 @@ import React from 'react';
 import { useState, useEffect } from "react";
 import { auth, db, doc, getDoc, updateDoc } from "../firebase";
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
+import { collection, getDocs, serverTimestamp } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
   const [user, setUser] = useState(null);
@@ -9,6 +11,9 @@ const Profile = () => {
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({});
   const [profilePic, setProfilePic] = useState(null);
+  const [registeredWorkshops, setRegisteredWorkshops] = useState([]);
+  const [workshopDetails, setWorkshopDetails] = useState({});
+  const navigate = useNavigate();
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
@@ -20,10 +25,15 @@ const Profile = () => {
           const data = userSnap.data();
           setUserData(data);
           setFormData(data);
+          
+          // Fetch registered workshops
+          await fetchRegisteredWorkshops(currentUser.uid);
         }
       } else {
         setUser(null);
         setUserData(null);
+        setRegisteredWorkshops([]);
+        setWorkshopDetails({});
       }
     });
     return () => unsubscribe();
@@ -71,6 +81,80 @@ const Profile = () => {
 
   const handleFileChange = (e) => {
     setProfilePic(e.target.files[0]);
+  };
+
+  const fetchRegisteredWorkshops = async (userId) => {
+    try {
+      const registeredWorkshopsRef = collection(db, "registered_workshops", userId, "workshops");
+      const registeredWorkshopsSnap = await getDocs(registeredWorkshopsRef);
+      const registeredWorkshopsData = registeredWorkshopsSnap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setRegisteredWorkshops(registeredWorkshopsData);
+
+      // Fetch workshop details for each registration
+      const details = {};
+      for (const registration of registeredWorkshopsData) {
+        const workshopRef = doc(db, "workshops", registration.workshopId);
+        const workshopSnap = await getDoc(workshopRef);
+        if (workshopSnap.exists()) {
+          details[registration.workshopId] = workshopSnap.data();
+        }
+      }
+      setWorkshopDetails(details);
+    } catch (error) {
+      console.error("Error fetching registered workshops:", error);
+    }
+  };
+
+  const handlePayment = (workshop) => {
+    if (!workshop.paymentLink) {
+      alert("Payment link not available for this workshop");
+      return;
+    }
+    window.open(workshop.paymentLink, "_blank");
+    // After payment, show receipt upload
+    setTimeout(() => {
+      const receiptFile = prompt("Please upload your payment receipt. Enter the file path or select the file:");
+      if (receiptFile) {
+        handleReceiptUpload(workshop);
+      }
+    }, 1000);
+  };
+
+  const handleReceiptUpload = async (registration) => {
+    if (!user) return;
+
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,.pdf';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      try {
+        const storage = getStorage();
+        const storageRef = ref(storage, `workshop_registration/${user.uid}/${registration.workshopId}/${file.name}`);
+        await uploadBytes(storageRef, file);
+        const receiptUrl = await getDownloadURL(storageRef);
+
+        // Update registration with receipt URL and payment status
+        const userRegistrationRef = doc(db, "registered_workshops", user.uid, "workshops", registration.workshopId);
+        await updateDoc(userRegistrationRef, {
+          receiptUrl: receiptUrl,
+          paymentStatus: "completed",
+          paymentDate: serverTimestamp()
+        });
+
+        alert("Receipt uploaded successfully! Payment completed.");
+        fetchRegisteredWorkshops(user.uid);
+      } catch (error) {
+        console.error("Error uploading receipt:", error);
+        alert("Error uploading receipt. Please try again.");
+      }
+    };
+    input.click();
   };
 
   if (!user || !userData) {
@@ -136,6 +220,84 @@ const Profile = () => {
             <p className="mb-4"><strong>TechID:</strong> {userData.techid}</p>
             <p className="mb-4"><strong>Festival Fee Verification:</strong> {userData.festivalFeeVerification}</p>
             <button onClick={handleEdit} className="bg-blue-500 text-white px-6 py-2 rounded hover:bg-blue-600 mt-4">Edit Profile</button>
+            
+            {/* Registered Workshops Section */}
+            <div className="mt-8 border-t pt-6">
+              <h3 className="text-lg font-semibold mb-4">Registered Workshops ({registeredWorkshops.length}/3)</h3>
+              {registeredWorkshops.length === 0 ? (
+                <p className="text-gray-600 text-sm">No workshops registered yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {registeredWorkshops.map((registration) => {
+                    const workshop = workshopDetails[registration.workshopId];
+                    return (
+                      <div key={registration.workshopId} className="border rounded p-3 bg-gray-50">
+                        <h4 className="font-medium">{registration.workshopName}</h4>
+                        <p className="text-sm text-gray-600">Fee: ₹{registration.workshopFee}</p>
+                        <p className="text-sm">
+                          Status: 
+                          <span className={`ml-1 px-2 py-1 rounded text-xs ${
+                            registration.paymentStatus === 'completed' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {registration.paymentStatus === 'completed' ? 'Payment Completed' : 'Payment Pending'}
+                          </span>
+                          <span className={`ml-2 px-2 py-1 rounded text-xs ${
+                            registration.approval === 'approved' 
+                              ? 'bg-green-100 text-green-800' 
+                              : registration.approval === 'rejected' 
+                              ? 'bg-red-100 text-red-800' 
+                              : 'bg-yellow-100 text-yellow-800'
+                          }`}>
+                            {registration.approval ? `Approval ${registration.approval.charAt(0).toUpperCase() + registration.approval.slice(1)}` : 'Approval Pending'}
+                          </span>
+                        </p>
+                        
+                        {registration.paymentStatus === 'pending' && workshop?.paymentLink && (
+                          <div className="mt-2 flex space-x-2">
+                            <button
+                              onClick={() => window.open(workshop.paymentLink, "_blank")}
+                              className="bg-yellow-500 text-white px-3 py-1 rounded text-sm hover:bg-yellow-600 transition-colors"
+                            >
+                              Pay Now
+                            </button>
+                            <button
+                              onClick={() => handleReceiptUpload(registration)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600 transition-colors"
+                            >
+                              Upload Receipt
+                            </button>
+                          </div>
+                        )}
+                        
+                        {registration.receiptUrl && (
+                          <div className="mt-2">
+                            <a
+                              href={registration.receiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 text-sm underline"
+                            >
+                              View Receipt
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
+              {registeredWorkshops.length < 3 && (
+                <button
+                  onClick={() => navigate("/workshops")}
+                  className="mt-4 bg-purple-500 text-white px-4 py-2 rounded hover:bg-purple-600 transition-colors text-sm"
+                >
+                  Browse More Workshops
+                </button>
+              )}
+            </div>
           </>
         )}
       </div>

@@ -1,7 +1,7 @@
-import { db } from '../firebase.js';
+const { db } = require('../firebase.js');
 
 // Get all users from Firestore
-export const getAllUsers = async (req, res) => {
+const getAllUsers = async (req, res) => {
   try {
     const usersSnapshot = await db.collection('users').get();
     
@@ -37,7 +37,7 @@ export const getAllUsers = async (req, res) => {
 };
 
 // Get user by ID
-export const getUserById = async (req, res) => {
+const getUserById = async (req, res) => {
   try {
     const { userId } = req.params;
     
@@ -68,7 +68,7 @@ export const getUserById = async (req, res) => {
 };
 
 // Delete user by ID
-export const deleteUser = async (req, res) => {
+const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
     
@@ -87,3 +87,5 @@ export const deleteUser = async (req, res) => {
     });
   }
 };
+
+module.exports = { getAllUsers, getUserById, deleteUser };

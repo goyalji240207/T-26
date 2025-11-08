@@ -1,9 +1,10 @@
-import express from "express";
-import cors from "cors";
-import dotenv from "dotenv";
-import admin from "firebase-admin";
-import { db, auth, bucket } from "./firebase.js";
-import userRoutes from "./routes/user.route.js";
+const express = require('express');
+const cors = require('cors');
+const dotenv = require('dotenv');
+const admin = require('firebase-admin');
+const { db, auth, bucket } = require('./firebase.js');
+const userRoutes = require('./routes/user.route.js');
+const workshopRoutes = require('./routes/workshop.route.js');
 // central route file (you can split by feature)
 
 // Load environment variables
@@ -21,6 +22,7 @@ app.locals.bucket = bucket;
 
 // Routes
 app.use("/api", userRoutes);
+app.use("/api/workshops", workshopRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {

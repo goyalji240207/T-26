@@ -8,6 +8,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
 
@@ -28,7 +29,8 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const provider = new GoogleAuthProvider();
 export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // 👇 Export Firestore helpers properly
-export { doc, getDoc, setDoc, signInWithPopup, signOut, updateDoc };
+export { doc, getDoc, setDoc, signInWithPopup, signOut, updateDoc, ref, uploadBytes, getDownloadURL, deleteObject };
 const analytics = getAnalytics(app);

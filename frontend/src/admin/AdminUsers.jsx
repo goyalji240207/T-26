@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { auth } from '../firebase';
 
 const AdminUsers = () => {
   const [users, setUsers] = useState([]);
@@ -8,11 +9,33 @@ const AdminUsers = () => {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
-        // Use the backend API instead of direct Firebase calls
-        const response = await fetch('http://localhost:5000/api/users');
+        // Wait for authentication state to be ready
+        await new Promise((resolve) => {
+          const unsubscribe = auth.onAuthStateChanged((user) => {
+            unsubscribe();
+            resolve(user);
+          });
+        });
+
+        // Get the current user's authentication token
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          throw new Error('Not authenticated. Please log in as admin.');
+        }
+
+        // Get the ID token
+        const token = await currentUser.getIdToken();
+
+        // Use the backend API with authentication
+        const response = await fetch('http://localhost:5000/api/users', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
         if (!response.ok) {
-          throw new Error('Failed to fetch users');
+          const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+          throw new Error(errorData.message || 'Failed to fetch users');
         }
         
         const result = await response.json();
@@ -36,15 +59,28 @@ const AdminUsers = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
       try {
+        // Get the current user's authentication token
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          throw new Error('Not authenticated');
+        }
+
+        // Get the ID token
+        const token = await currentUser.getIdToken();
+
         const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
           method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
         });
 
         if (response.ok) {
           // Remove the user from the local state
           setUsers(users.filter(user => user.id !== userId));
         } else {
-          throw new Error('Failed to delete user');
+          const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+          throw new Error(errorData.message || 'Failed to delete user');
         }
       } catch (error) {
         console.error('Error deleting user:', error);

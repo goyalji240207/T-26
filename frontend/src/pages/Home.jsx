@@ -173,6 +173,13 @@ const Home = () => {
           >
             Go to Profile
           </button>
+
+          <button
+            onClick={() => navigate("/workshops")}
+            className="bg-purple-500 text-white px-6 py-2 rounded hover:bg-purple-600 mt-4"
+          >
+            Browse Workshops
+          </button>
         </>
       )}
     </div>
