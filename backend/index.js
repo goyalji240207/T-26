@@ -5,6 +5,7 @@ const admin = require('firebase-admin');
 const { db, auth, bucket } = require('./firebase.js');
 const userRoutes = require('./routes/user.route.js');
 const workshopRoutes = require('./routes/workshop.route.js');
+const competitionsRoutes= require('./routes/competitions.routes.js');
 // central route file (you can split by feature)
 
 // Load environment variables
@@ -23,6 +24,7 @@ app.locals.bucket = bucket;
 // Routes
 app.use("/api", userRoutes);
 app.use("/api/workshops", workshopRoutes);
+app.use("/api/competitions", competitionsRoutes);
 
 // Root endpoint
 app.get("/", (req, res) => {
